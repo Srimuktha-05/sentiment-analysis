@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SentimentAI – Sentiment Analyzer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet"/>
+  <style>
+    /* ── CSS Variables ── */
+    :root {
+      --bg:       #0b0c10;
+      --surface:  #13151c;
+      --border:   #1f2230;
+      --accent:   #7c6cfc;
+      --accent2:  #c084fc;
+      --text:     #e8eaf0;
+      --muted:    #6b7280;
+      --pos:      #22c55e;
+      --neg:      #ef4444;
+      --neu:      #f59e0b;
+      --radius:   16px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px 48px;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated background blobs ── */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.18;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::before {
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, #7c6cfc, #c084fc);
+      top: -120px; left: -120px;
+      animation: drift1 12s ease-in-out infinite alternate;
+    }
+    body::after {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, #22c55e, #06b6d4);
+      bottom: -80px; right: -80px;
+      animation: drift2 15s ease-in-out infinite alternate;
+    }
+    @keyframes drift1 { to { transform: translate(60px, 80px); } }
+    @keyframes drift2 { to { transform: translate(-50px, -60px); } }
+
+    /* ── Card ── */
+    .card {
+      position: relative;
+      z-index: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 48px 44px;
+      width: 100%;
+      max-width: 620px;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04) inset;
+    }
+
+    /* ── Header ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124,108,252,0.12);
+      border: 1px solid rgba(124,108,252,0.3);
+      border-radius: 99px;
+      padding: 4px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--accent2);
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .badge::before { content: '◉'; font-size: 9px; color: #7c6cfc; }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(28px, 5vw, 38px);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 8px;
+      background: linear-gradient(130deg, #e8eaf0 30%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 36px;
+      line-height: 1.6;
+    }
+
+    /* ── Form ── */
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    textarea {
+      width: 100%;
+      background: #0d0e14;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 16px 18px;
+      resize: vertical;
+      min-height: 130px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    textarea::placeholder { color: #3a3d52; }
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(124,108,252,0.15);
+    }
+
+    .char-count {
+      text-align: right;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+      margin-bottom: 20px;
+    }
+
+    /* ── Examples ── */
+    .examples {
+      margin-bottom: 20px;
+    }
+    .examples p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .example-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 5px 14px;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chip:hover {
+      background: rgba(124,108,252,0.1);
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    /* ── Button ── */
+    button[type="submit"] {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #7c6cfc, #c084fc);
+      color: #fff;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+      box-shadow: 0 8px 24px rgba(124,108,252,0.35);
+    }
+    button[type="submit"]:hover  { opacity: 0.9; box-shadow: 0 12px 32px rgba(124,108,252,0.5); }
+    button[type="submit"]:active { transform: scale(0.98); }
+
+    /* ── Error ── */
+    .error-box {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.25);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      font-size: 14px;
+      color: #fca5a5;
+      margin-top: 24px;
+    }
+
+    /* ── Result ── */
+    .result-box {
+      margin-top: 32px;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      animation: slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes slideUp {
+      from { opacity:0; transform: translateY(20px) scale(0.97); }
+      to   { opacity:1; transform: translateY(0)    scale(1); }
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+    }
+    .result-header.positive { background: rgba(34,197,94,0.1);  border-bottom: 1px solid rgba(34,197,94,0.2); }
+    .result-header.negative { background: rgba(239,68,68,0.1);  border-bottom: 1px solid rgba(239,68,68,0.2); }
+    .result-header.neutral  { background: rgba(245,158,11,0.1); border-bottom: 1px solid rgba(245,158,11,0.2); }
+
+    .result-label {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .result-label.positive { color: var(--pos); }
+    .result-label.negative { color: var(--neg); }
+    .result-label.neutral  { color: var(--neu); }
+
+    .result-emoji { font-size: 28px; }
+
+    .confidence-badge {
+      background: rgba(255,255,255,0.07);
+      border-radius: 99px;
+      padding: 4px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .result-body { padding: 20px 24px; background: rgba(255,255,255,0.02); }
+
+    .analyzed-text {
+      font-size: 14px;
+      color: var(--muted);
+      font-style: italic;
+      margin-bottom: 20px;
+      line-height: 1.6;
+      padding-left: 12px;
+      border-left: 3px solid var(--border);
+    }
+
+    /* ── Probability Bars ── */
+    .prob-section { }
+    .prob-section h4 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      margin-bottom: 14px;
+      font-weight: 500;
+    }
+
+    .prob-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .prob-row-label {
+      width: 70px;
+      font-size: 13px;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+    .prob-bar-wrap {
+      flex: 1;
+      background: rgba(255,255,255,0.05);
+      border-radius: 99px;
+      height: 8px;
+      overflow: hidden;
+    }
+    .prob-bar {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+    }
+    .prob-bar.pos { background: linear-gradient(90deg, #16a34a, #22c55e); }
+    .prob-bar.neg { background: linear-gradient(90deg, #b91c1c, #ef4444); }
+    .prob-bar.neu { background: linear-gradient(90deg, #b45309, #f59e0b); }
+
+    .prob-pct {
+      font-size: 13px;
+      font-weight: 600;
+      width: 44px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      position: relative; z-index: 1;
+      margin-top: 28px;
+      font-size: 12px;
+      color: #3a3d52;
+      text-align: center;
+    }
+    .footer span { color: #4a4d6a; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="badge">NLP + Logistic Regression</div>
+
+  <h1>Sentiment<br>Analyzer</h1>
+  <p class="subtitle">
+    Enter any review, comment, or sentence and the model will classify its sentiment as
+    <strong style="color:var(--pos)">Positive</strong>,
+    <strong style="color:var(--neg)">Negative</strong>, or
+    <strong style="color:var(--neu)">Neutral</strong>.
+  </p>
+
+  <form method="POST" action="/predict">
+    <label for="review">Enter Text</label>
+    <textarea id="review" name="review" placeholder="Type or paste any text here… e.g. 'The product quality was excellent and delivery was fast!'"
+              maxlength="500" oninput="updateCount(this)">{{ user_text or '' }}</textarea>
+    <div class="char-count"><span id="charCount">{{ (user_text or '')|length }}</span> / 500</div>
+
+    <div class="examples">
+      <p>Try an example</p>
+      <div class="example-chips">
+        <span class="chip" onclick="fillText('I absolutely love this product, it is amazing!')">😊 Positive</span>
+        <span class="chip" onclick="fillText('Terrible quality, completely disappointed.')">😞 Negative</span>
+        <span class="chip" onclick="fillText('The product is okay, nothing special.')">😐 Neutral</span>
+        <span class="chip" onclick="fillText('Fast delivery and great customer support!')">🚀 Great Service</span>
+      </div>
+    </div>
+
+    <button type="submit">Analyze Sentiment →</button>
+  </form>
+
+  {% if error %}
+  <div class="error-box">⚠ {{ error }}</div>
+  {% endif %}
+
+  {% if prediction_text %}
+  <div class="result-box">
+    <div class="result-header {{ prediction_text | lower }}">
+      <div class="result-label {{ prediction_text | lower }}">
+        <span class="result-emoji">{{ emoji }}</span>
+        {{ prediction_text }}
+      </div>
+      <div class="confidence-badge">{{ confidence }}% confident</div>
+    </div>
+    <div class="result-body">
+      {% if user_text %}
+      <p class="analyzed-text">"{{ user_text }}"</p>
+      {% endif %}
+
+      <div class="prob-section">
+        <h4>Confidence Breakdown</h4>
+
+        <div class="prob-row">
+          <div class="prob-row-label" style="color:var(--pos)">Positive</div>
+          <div class="prob-bar-wrap">
+            <div class="prob-bar pos" style="width: {{ pos_conf }}%"></div>
+          </div>
+          <div class="prob-pct" style="color:var(--pos)">{{ pos_conf }}%</div>
+        </div>
+
+        <div class="prob-row">
+          <div class="prob-row-label" style="color:var(--neg)">Negative</div>
+          <div class="prob-bar-wrap">
+            <div class="prob-bar neg" style="width: {{ neg_conf }}%"></div>
+          </div>
+          <div class="prob-pct" style="color:var(--neg)">{{ neg_conf }}%</div>
+        </div>
+
+        <div class="prob-row">
+          <div class="prob-row-label" style="color:var(--neu)">Neutral</div>
+          <div class="prob-bar-wrap">
+            <div class="prob-bar neu" style="width: {{ neu_conf }}%"></div>
+          </div>
+          <div class="prob-pct" style="color:var(--neu)">{{ neu_conf }}%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="footer">
+  BE AIML – VI Semester &nbsp;·&nbsp; Cloud Computing Assignment &nbsp;·&nbsp;
+  <span>Dr. Humera Shaziya</span>
+</div>
+
+<script>
+  function updateCount(el) {
+    document.getElementById('charCount').textContent = el.value.length;
+  }
+  function fillText(text) {
+    const ta = document.getElementById('review');
+    ta.value = text;
+    updateCount(ta);
+  }
+</script>
+</body>
+</html>
